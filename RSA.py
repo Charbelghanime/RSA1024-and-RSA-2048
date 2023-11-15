@@ -3,8 +3,8 @@ import os
 from Crypto.Hash import SHA256,SHA512,SHA384,MD5,SHA1
 from Crypto.Signature import pkcs1_15
 from Crypto.Signature.pkcs1_15 import PKCS115_SigScheme # to used for signature.
-DEFAULT_BLOCK_SIZE = 256
-BYTE_SIZE = 256 
+DEFAULT_BLOCK_SIZE = 128
+BYTE_SIZE = 128 
 hash="SHA-256" #will be used by default
 def getBlocksFromText(message, blockSize=DEFAULT_BLOCK_SIZE):
     messageBytes = message.encode('ascii')
@@ -32,20 +32,13 @@ def getTextFromBlocks(blockInts, messageLength, blockSize=DEFAULT_BLOCK_SIZE):
 
 
 
-def encryptMessage(message, public_key_file, blockSize=DEFAULT_BLOCK_SIZE, encrypted_blocks_file='encrypted_blocks.txt'):
+def encryptMessage(message, public_key_file='public_key.txt', blockSize=DEFAULT_BLOCK_SIZE, encrypted_blocks_file='encrypted_blocks.txt'):
     encryptedBlocks = []
 
-    # Read n and e from public_key.txt
+    # Read public key (n, e) from the public_key_file
     with open(public_key_file, 'r') as public_key_file:
-        public_key_contents = public_key_file.read()
-        # Extract n and e from the contents
-        n_start = public_key_contents.find('(') + 1
-        n_end = public_key_contents.find(',')
-        n = int(public_key_contents[n_start:n_end].strip())
-
-        e_start = n_end + 1
-        e_end = public_key_contents.find(')')
-        e = int(public_key_contents[e_start:e_end].strip())
+        # Skip lines that are not numeric
+        n, e = [int(line.strip()) for line in public_key_file.readlines() if line.strip().isdigit()]
 
     # Ensure that the message is a multiple of the block size
     padded_message = message.ljust((len(message) // blockSize + 1) * blockSize, '\0')
@@ -57,9 +50,6 @@ def encryptMessage(message, public_key_file, blockSize=DEFAULT_BLOCK_SIZE, encry
             encrypted_file.write(f"{encrypted_block}\n")
 
     return encrypted_blocks_file
-
-
-
 
 
 def decryptMessage(private_key_n_file, private_key_d_file, encrypted_blocks_file, messageLength=None, key=None, blockSize=DEFAULT_BLOCK_SIZE):
@@ -118,38 +108,27 @@ def generate_random_message(length):
     import string
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
 
-def encryptMessage(message, key, blockSize=DEFAULT_BLOCK_SIZE, encrypted_blocks_file='encrypted_blocks.txt'):
-    encryptedBlocks = []
-    n, e = key
-
-    # Ensure that the message is a multiple of the block size
-    padded_message = message.ljust((len(message) // blockSize + 1) * blockSize, '\0')
-
-    with open(encrypted_blocks_file, 'w') as encrypted_file:
-        for block in getBlocksFromText(padded_message, blockSize):
-            encrypted_block = pow(block, e, n)
-            encryptedBlocks.append(encrypted_block)
-            encrypted_file.write(f"{encrypted_block}\n")
-
-    return encrypted_blocks_file
 
 def main():
     # Generate a key pair
-    public_key, private_key = kg.keygenerated(2048)
+    public_key, private_key = kg.keygenerated(1024)
 
+    # Save public key to a file
+    public_key_file = 'public_key.txt'
+
+    # Extract the public key from the tuple
+    actual_public_key = public_key[0]
 
     # Generate a random message
     random_message = generate_random_message(50)
     print("Original Message:", random_message)
 
-    # Encrypt the message
-    encrypted_blocks_file = encryptMessage(random_message, public_key)
+    # Encrypt the message using the correct public key
+    encrypted_blocks_file = encryptMessage(random_message, public_key_file)
 
     # Decrypt the message
     decrypted_message = decryptMessage('private_key_n.txt', 'private_key_d.txt', encrypted_blocks_file, len(random_message), private_key)
     print("Decrypted Message:", decrypted_message)
-
-
 
 if __name__ == "__main__":
     main()
