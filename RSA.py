@@ -32,13 +32,11 @@ def getTextFromBlocks(blockInts, messageLength, blockSize=DEFAULT_BLOCK_SIZE):
 
 
 
-def encryptMessage(message, public_key_file='public_key.txt', blockSize=DEFAULT_BLOCK_SIZE, encrypted_blocks_file='encrypted_blocks.txt'):
+def encryptMessage(message, public_key, blockSize=DEFAULT_BLOCK_SIZE, encrypted_blocks_file='encrypted_blocks.txt'):
     encryptedBlocks = []
 
-    # Read public key (n, e) from the public_key_file
-    with open(public_key_file, 'r') as public_key_file:
-        # Skip lines that are not numeric
-        n, e = [int(line.strip()) for line in public_key_file.readlines() if line.strip().isdigit()]
+    # Extract public key components (n, e)
+    n, e = public_key
 
     # Ensure that the message is a multiple of the block size
     padded_message = message.ljust((len(message) // blockSize + 1) * blockSize, '\0')
@@ -50,6 +48,7 @@ def encryptMessage(message, public_key_file='public_key.txt', blockSize=DEFAULT_
             encrypted_file.write(f"{encrypted_block}\n")
 
     return encrypted_blocks_file
+
 
 
 def decryptMessage(private_key_n_file, private_key_d_file, encrypted_blocks_file, messageLength=None, key=None, blockSize=DEFAULT_BLOCK_SIZE):
@@ -66,65 +65,68 @@ def decryptMessage(private_key_n_file, private_key_d_file, encrypted_blocks_file
             decryptedBlocks.append(decrypted_block)
 
     return getTextFromBlocks(decryptedBlocks, messageLength, blockSize)
-
-
-# def sign_message(privatekey, message,hashalgo):
-#     global hash # since that hash will be used in decryption
-#     hash_alg=hash
-#     signer=PKCS115_SigScheme(privatekey)#here the private will be signed.
-#     if (hash == "SHA-512"):
-#       signed = SHA512.new()
-#     elif (hash == "SHA-384"):
-#       signed = SHA384.new()
-#     elif (hash == "SHA-256"):
-#       signed = SHA256.new()
-#     elif (hash == "SHA-1"):
-#       signed = SHA1.new()
-#     else:
-#       signed = MD5.new()
-#     signed.update(message)
-#     return signer.sign(signed)
-# def verify_signature(message, signature, public_key):
-#     verifier = pkcs1_15.new(public_key)
-    
-#     if hash == "SHA-512":
-#         digest = SHA512.new()
-#     elif hash == "SHA-384":
-#         digest = SHA384.new()
-#     elif hash == "SHA-256":
-#         digest = SHA256.new()
-#     elif hash == "SHA-1":
-#         digest = SHA1.new()
-#     else:
-#         digest = MD5.new()
-    
-#     digest.update(message)
-#     return verifier.verify(digest, signature)
-
-
-
 def generate_random_message(length):
     import random
     import string
     return ''.join(random.choice(string.ascii_letters + string.digits) for _ in range(length))
+def generate_signature(message, private_key, signature_file='signature.txt'):
+    # Extract private key components (n, d)
+    n, d = private_key
 
+    # Hash the message using SHA-256
+    hashed_message = int(SHA256.new(message.encode()).hexdigest(), 16)
 
+    # Sign the hashed message using the private key
+    signature = pow(hashed_message, d, n)
+
+    # Save the signature to a file
+    with open(signature_file, 'w') as signature_file:
+        signature_file.write(str(signature))
+
+    return signature
+
+def verify_signature(message, public_key, signature_file='signature.txt'):
+    # Extract public key components (n, e)
+    n, e = public_key
+
+    # Hash the message using SHA-256
+    hashed_message = int(SHA256.new(message.encode()).hexdigest(), 16)
+
+    # Read the signature from the file
+    with open(signature_file, 'r') as signature_file:
+        signature = int(signature_file.read().strip())
+
+    # Verify the signature using the public key
+    decrypted_signature = pow(signature, e, n)
+    return decrypted_signature == hashed_message
 def main():
-    # Generate a key pair
-    public_key, private_key = kg.keygenerated(1024)
+    y = int(input("Enter the key size: "))
+    public_key, private_key = kg.keygenerated(y)
 
-    # Save public key to a file
+    # Save public and private keys to files
     public_key_file = 'public_key.txt'
+    private_key_file = 'private_key_d.txt'
 
-    # Extract the public key from the tuple
-    actual_public_key = public_key[0]
+    with open(public_key_file, 'w') as public_key_file:
+        public_key_file.write(f"{public_key[0]}\n{public_key[1]}")
+
+    with open(private_key_file, 'w') as private_key_file:
+        private_key_file.write(f"{private_key[0]}\n{private_key[1]}")
 
     # Generate a random message
     random_message = generate_random_message(50)
     print("Original Message:", random_message)
 
+    # Generate a digital signature for the message and save it to a file
+    signature = generate_signature(random_message, private_key)
+    print("Digital Signature:", signature)
+
+    # Verify the signature from the file
+    verification_result = verify_signature(random_message, public_key)
+    print("Signature Verification Result:", verification_result)
+
     # Encrypt the message using the correct public key
-    encrypted_blocks_file = encryptMessage(random_message, public_key_file)
+    encrypted_blocks_file = encryptMessage(random_message, public_key)
 
     # Decrypt the message
     decrypted_message = decryptMessage('private_key_n.txt', 'private_key_d.txt', encrypted_blocks_file, len(random_message), private_key)
@@ -132,16 +134,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-# message_to_sign = b'This is a test message.'
-
-# # Choose a hash algorithm
-# hash_algorithm = "SHA-256"
-
-# # Sign the message
-# signature = sign_message(private_key, message_to_sign, hash_algorithm)
-# print("Signature:", signature)
-
-# # Verify the signature
-# is_valid_signature = verify_signature(message_to_sign, signature, public_key)
-# print("Is Valid Signature:", is_valid_signature)
